@@ -1,0 +1,63 @@
+version: '3'
+services:
+  frontend:
+    build: # 개발환경을 위한 Dockerfile이 어디있는지 명시
+      dockerfile: Dockerfile.dev
+      context: ./frontend
+    volumes: 
+      - /app/node_modules
+      - ./frontend:/app
+      # 코드를 수정 후 다시 이미지를 build하는 것 없이 수정된 코드가 
+      # 반영이 될 수 있게 volume을 이용해줍니다.
+    stdin_open: true
+      # 리액트 앱을 종료할 때 나오는 버그를 잡아줌
+  nginx:
+    restart: always
+      """
+      재시작 정책
+      restart: "no" => 어떠한 상황에서도 재시작을 하지 않음
+      restart: always => 항상 재시작
+      restart: on-failure => on-failure 에러 코드와 함께 컨테이너 멈췄을때만 재시작
+      restart: unless-stopped => 개발자가 임의로 멈추려고 할때 제외 항상 재시작
+      """
+    build: 
+      dockerfile: Dockerfile.dev
+      context: ./nginx
+    ports:
+      - "3000:80" # local 3000 & in container 80 port mapping
+
+  backend:
+    build: 
+      dockerfile: Dockerfile.dev
+      context: ./backend
+    container_name: app_backend
+    volumes:
+      - /app/node_modules
+      - ./backend:/app
+  mysql:
+    build: ./mysql
+    restart: unless-stopped
+    container_name: app_mysql
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql/mysql_data:/var/lib/mysql # 컨테이너안에 디렉토리가 로컬 디렉토리를 참조하는 형식
+      - ./mysql/sqls/:/docker-entrypoint-initdb.d/
+    """
+      이전의 volume의 용도는 리액트나 노드쪽에서 코드를 업데이트 할때 바로 그 코드가 애플리케이션에
+      적용될 수 있게 해주기 위해서 사용을 했었음.
+      이번에는 데이터베이스의 저장된 자료를 컨테이너를 지우더라도 자료가 지워지지 않을 수 있게 해주기 위한 볼륨
+      원래는 컨테이너를 지우면 컨테이너에 저장된 데이터들이 지워지게 됨.
+      영속성이 필요한 데이터들의 처리를 위하여 volume을 사용
+
+      호스트 파일 시스템에 저장을 하도록 설정.
+      도커에 의해서만 통제가 되는 도커 Area에 저장이 되므로
+      컨테이너가 지워져도 데이터가 사라지지 않음.      
+
+      Volume이란?
+        볼륨은 도커 컨테이너에 의해 생성되고 사용되는 지속적인 데이터를 위한 선호 메커니즘이다.
+    
+    environment:
+      MYSQL_ROOT_PASSWORD: dnaksehd0793
+      MYSQL_DATABASE: myapp
+    """
